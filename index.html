@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistema Future — Endocommerce</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -526,7 +527,7 @@ function showTab(id){
   event.target.classList.add('active');
   if(id==='geral') renderCharts();
   if(id==='abc') renderABC();
-  if(id==='kits') renderKitProds('');
+  if(id==='kits'){renderKitProds('');carregarKitsSalvos();}
   if(id==='campanha') renderCampanha();
 }
 
@@ -846,10 +847,17 @@ function renderABC(){
   document.getElementById('abcTbody').innerHTML=html||'<tr><td colspan="8" class="empty">Nenhum produto</td></tr>';
 }
 
+// ── Supabase ──────────────────────────────────────────────────────
+const SB = supabase.createClient(
+  'https://bdmwvujqldwgeuwfpqaf.supabase.co',
+  'sb_publishable_SY5OwtZoXTXYPFu0jE5ymQ_Gamf9Iw3'
+);
+
 // ── Kits ──────────────────────────────────────────────────────────
 let kitItens=[];
-let kitsSalvos=JSON.parse(localStorage.getItem('futureKits')||'[]');
+let kitsSalvos=[];
 function getProd(sku){return PRODS.find(p=>p.sku===sku)}
+
 function renderKitProds(q){
   q=q.toLowerCase();
   const inKit=new Set(kitItens.map(i=>i.sku));
@@ -869,12 +877,14 @@ function renderKitProds(q){
   }
   document.getElementById('kitProdList').innerHTML=html;
 }
+
 function addKitItem(sku){
   const ex=kitItens.find(i=>i.sku===sku);
   if(ex)ex.qt++;else kitItens.push({sku,qt:1});
   renderKitResumo();
   renderKitProds(document.querySelector('.kit-left input').value||'');
 }
+
 function renderKitResumo(){
   const desc=parseFloat(document.getElementById('kitDesc').value)||0;
   const base=document.getElementById('kitPrecoBase').value;
@@ -902,46 +912,72 @@ function renderKitResumo(){
   document.getElementById('ktCusto').textContent=fmt(custo);
   document.getElementById('ktMargem').textContent=marg+'%';
 }
+
 function chgQt(sku,d){const i=kitItens.find(x=>x.sku===sku);if(i)i.qt=Math.max(1,i.qt+d);renderKitResumo();}
 function delKitItem(sku){kitItens=kitItens.filter(x=>x.sku!==sku);renderKitResumo();renderKitProds('');}
-function salvarKit(){
+
+async function salvarKit(){
   if(!kitItens.length){alert('Adicione itens ao kit');return}
   const nome=document.getElementById('kitNome').value||'Kit sem nome';
   const desc=parseFloat(document.getElementById('kitDesc').value)||0;
   const base=document.getElementById('kitPrecoBase').value;
-  kitsSalvos.push({nome,desc,base,itens:[...kitItens],data:new Date().toLocaleDateString('pt-BR')});
-  localStorage.setItem('futureKits',JSON.stringify(kitsSalvos));
-  renderKitsSalvos();alert('Kit salvo!');
+  const btn=document.querySelector('.kit-actions .btn-main');
+  btn.textContent='Salvando...';btn.disabled=true;
+  const {error}=await SB.from('kits').insert({nome,desconto:desc,preco_base:base,itens:kitItens});
+  btn.textContent='💾 Salvar Kit';btn.disabled=false;
+  if(error){alert('Erro ao salvar: '+error.message);return;}
+  await carregarKitsSalvos();
+  alert('Kit salvo!');
 }
+
+async function carregarKitsSalvos(){
+  const grid=document.getElementById('kitsSalvosGrid');
+  grid.innerHTML='<div class="empty">Carregando...</div>';
+  const {data,error}=await SB.from('kits').select('*').order('criado_em',{ascending:false});
+  if(error){grid.innerHTML='<div class="empty">Erro ao carregar kits.</div>';return;}
+  kitsSalvos=data||[];
+  renderKitsSalvos();
+}
+
 function renderKitsSalvos(){
   const grid=document.getElementById('kitsSalvosGrid');
   if(!kitsSalvos.length){grid.innerHTML='<div class="empty">Nenhum kit salvo ainda.</div>';return;}
   let html='';
-  kitsSalvos.forEach((k,i)=>{
-    const total=k.itens.reduce((a,it)=>{const p=getProd(it.sku);return a+(p?pBase(p,k.base)*it.qt:0)},0);
-    const desc=k.desc||0;const final=total*(1-desc/100);
+  kitsSalvos.forEach(k=>{
+    const total=k.itens.reduce((a,it)=>{const p=getProd(it.sku);return a+(p?pBase(p,k.preco_base)*it.qt:0)},0);
+    const desc=k.desconto||0;const final=total*(1-desc/100);
     const n=k.itens.reduce((a,it)=>a+it.qt,0);
+    const data=k.criado_em?new Date(k.criado_em).toLocaleDateString('pt-BR'):'';
     html+=`<div class="kit-card">
       <div class="kc-nome">${k.nome}</div>
-      <div class="kc-info">${n} item(s) · ${desc}% desconto · ${k.data||''}</div>
+      <div class="kc-info">${n} item(s) · ${desc}% desconto · ${data}</div>
       <div class="kc-footer">
         <span class="kc-total">${fmt(final)}</span>
         <div style="display:flex;gap:4px">
-          <button class="btn-sm" onclick="carregarKit(${i})">Editar</button>
-          <button class="btn-sm" style="background:#dc2626" onclick="delKit(${i})">✕</button>
+          <button class="btn-sm" onclick="carregarKit('${k.id}')">Editar</button>
+          <button class="btn-sm" style="background:#dc2626" onclick="delKit('${k.id}')">✕</button>
         </div>
       </div>
     </div>`;
   });
   grid.innerHTML=html;
 }
-function carregarKit(i){const k=kitsSalvos[i];kitItens=k.itens.map(x=>({...x}));
+
+function carregarKit(id){
+  const k=kitsSalvos.find(x=>x.id===id);if(!k)return;
+  kitItens=k.itens.map(x=>({...x}));
   document.getElementById('kitNome').value=k.nome;
-  document.getElementById('kitDesc').value=k.desc;
-  document.getElementById('kitPrecoBase').value=k.base||'pvenda';
+  document.getElementById('kitDesc').value=k.desconto;
+  document.getElementById('kitPrecoBase').value=k.preco_base||'pvenda';
   renderKitResumo();renderKitProds('');
 }
-function delKit(i){kitsSalvos.splice(i,1);localStorage.setItem('futureKits',JSON.stringify(kitsSalvos));renderKitsSalvos();}
+
+async function delKit(id){
+  if(!confirm('Excluir este kit?'))return;
+  await SB.from('kits').delete().eq('id',id);
+  await carregarKitsSalvos();
+}
+
 function exportKitPDF(){window.print()}
 
 // ── Campanha ──────────────────────────────────────────────────────
@@ -1033,7 +1069,7 @@ function populateSelects(){
 populateSelects();
 renderProdutos();
 renderEstoque();
-renderKitsSalvos();
+carregarKitsSalvos();
 renderCharts();
 </script>
 </body>
