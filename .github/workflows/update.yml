@@ -1,0 +1,44 @@
+name: Atualizar Estoque
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 20 * * *'  # 17:30 BRT (UTC-3) = 20:30 UTC
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: pip install supabase
+
+      - name: Atualizar estoque (Tiny API)
+        env:
+          TINY_TOKEN: ${{ secrets.TINY_TOKEN }}
+          SUPABASE_SVC_KEY: ${{ secrets.SUPABASE_SVC_KEY }}
+          GITHUB_ACTIONS: 'true'
+        run: python atualizar_dados.py
+
+      - name: Gerar dashboard
+        env:
+          GITHUB_ACTIONS: 'true'
+        run: python build.py
+
+      - name: Publicar no GitHub Pages
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add index.html base_produtos.json
+          git diff --cached --quiet || git commit -m "Atualização automática $(date +'%Y-%m-%d %H:%M') UTC"
+          git push

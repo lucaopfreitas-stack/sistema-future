@@ -1,4 +1,3 @@
-atualizar_dados.py
 atualizar_dados_local.py
 *.log
 __pycache__
