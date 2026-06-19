@@ -188,6 +188,14 @@ input[type=range]{accent-color:var(--red);width:100%}
 .empty{text-align:center;color:var(--sub2);padding:36px;font-size:13px}
 .pag-info{font-size:11.5px;color:var(--sub);margin-top:10px;text-align:right}
 .flex-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+/* ── DATE RANGE ──────────────────────────────────────────── */
+.range-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.range-btn{background:var(--gray);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:11.5px;font-weight:600;cursor:pointer;color:var(--sub);transition:all .15s}
+.range-btn:hover{border-color:var(--red);color:var(--red)}
+.range-btn.active{background:var(--red);color:#fff;border-color:var(--red)}
+.range-custom{display:none;align-items:center;gap:8px}
+.range-custom input{border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;outline:none;color:var(--text)}
+.range-custom input:focus{border-color:var(--red)}
 </style>
 </head>
 <body>
@@ -301,12 +309,35 @@ input[type=range]{accent-color:var(--red);width:100%}
       <div class="kpi-val" id="kpi-curva-a">—</div>
       <div class="kpi-sub">top 80% do valor</div>
     </div>
+    <div class="kpi kpi--count">
+      <div class="kpi-accent"></div>
+      <svg class="kpi-icon" viewBox="0 0 24 24" fill="currentColor" style="color:#8B1010"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      <div class="kpi-label">Vendidos Hoje</div>
+      <div class="kpi-val" id="kpi-vendidos">—</div>
+      <div class="kpi-sub" id="kpi-vendidos-sub">aguardando dados</div>
+    </div>
   </div>
   <div class="charts-grid">
     <div class="chart-box"><div class="chart-title">Estoque por Categoria</div><canvas id="chartCat"></canvas></div>
     <div class="chart-box"><div class="chart-title">Distribuição Curva ABC (por valor em estoque)</div><canvas id="chartABC"></canvas></div>
     <div class="chart-box"><div class="chart-title">Top 15 Produtos por Valor em Estoque</div><canvas id="chartTop"></canvas></div>
     <div class="chart-box"><div class="chart-title">Margem por Faixa (%)</div><canvas id="chartMargem"></canvas></div>
+  </div>
+  <div class="chart-box" style="margin-bottom:28px">
+    <div class="chart-title">Vendas por Dia (unidades saídas do estoque)</div>
+    <div class="range-btns">
+      <button class="range-btn" data-range="hoje" onclick="setRange('hoje')">Hoje</button>
+      <button class="range-btn" data-range="ontem" onclick="setRange('ontem')">Ontem</button>
+      <button class="range-btn active" data-range="7dias" onclick="setRange('7dias')">Últimos 7 dias</button>
+      <button class="range-btn" data-range="personalizado" onclick="setRange('personalizado')">Personalizado</button>
+      <div class="range-custom" id="rangeCustom">
+        <input type="date" id="rangeFrom" onchange="renderVendasChart()">
+        <span style="font-size:12px;color:var(--sub)">até</span>
+        <input type="date" id="rangeTo" onchange="renderVendasChart()">
+      </div>
+    </div>
+    <canvas id="chartVendas" style="max-height:200px"></canvas>
+    <div id="vendasEmpty" style="text-align:center;color:var(--sub2);padding:24px;font-size:12px;display:none">Nenhum dado de vendas ainda. Aguardando primeira atualização de estoque.</div>
   </div>
 </div>
 
@@ -1056,6 +1087,125 @@ function exportarCampanhaExcel(){
   alert('Para exportar em Excel, use a opção Print → Save as PDF, ou solicite ao assistente a geração do XLSX.');
 }
 
+// ── Histórico de Vendas ───────────────────────────────────────────
+let vendasChart = null;
+let historicoData = [];
+let selectedRange = '7dias';
+
+async function carregarHistorico() {
+  const {data, error} = await SB
+    .from('estoque_historico')
+    .select('data, snapshots')
+    .order('data', {ascending: true})
+    .limit(31);
+  if (error || !data || data.length < 2) {
+    document.getElementById('kpi-vendidos').textContent = '—';
+    document.getElementById('kpi-vendidos-sub').textContent = 'sem dados ainda';
+    return;
+  }
+  historicoData = data;
+  atualizarKpiVendidos();
+  renderVendasChart();
+}
+
+function calcVendidosDia(d1, d2) {
+  let total = 0;
+  const snap1 = d1.snapshots || {};
+  const snap2 = d2.snapshots || {};
+  for (const [sku, est1] of Object.entries(snap1)) {
+    const est2 = snap2[sku] !== undefined ? snap2[sku] : est1;
+    total += Math.max(0, est1 - est2);
+  }
+  return total;
+}
+
+function atualizarKpiVendidos() {
+  if (historicoData.length < 2) return;
+  const n = historicoData.length;
+  const ultimo = historicoData[n - 1];
+  const penultimo = historicoData[n - 2];
+  const v = calcVendidosDia(penultimo, ultimo);
+  document.getElementById('kpi-vendidos').textContent = fmtN(v) + ' un';
+  const dataLabel = ultimo.data.split('-').reverse().join('/');
+  document.getElementById('kpi-vendidos-sub').textContent = 'atualizado ' + dataLabel;
+}
+
+function getVendasPeriodo() {
+  if (historicoData.length < 2) return [];
+  const diffs = [];
+  for (let i = 1; i < historicoData.length; i++) {
+    const v = calcVendidosDia(historicoData[i-1], historicoData[i]);
+    diffs.push({data: historicoData[i].data, vendidos: v});
+  }
+  const hoje = new Date().toISOString().split('T')[0];
+  const ontem = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  if (selectedRange === 'hoje') return diffs.filter(d => d.data === hoje);
+  if (selectedRange === 'ontem') return diffs.filter(d => d.data === ontem);
+  if (selectedRange === '7dias') {
+    const cutoff = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+    return diffs.filter(d => d.data >= cutoff);
+  }
+  if (selectedRange === 'personalizado') {
+    const from = document.getElementById('rangeFrom').value;
+    const to = document.getElementById('rangeTo').value;
+    if (!from || !to) return diffs;
+    return diffs.filter(d => d.data >= from && d.data <= to);
+  }
+  return diffs;
+}
+
+function setRange(r) {
+  selectedRange = r;
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('active', b.dataset.range === r));
+  document.getElementById('rangeCustom').style.display = r === 'personalizado' ? 'flex' : 'none';
+  renderVendasChart();
+}
+
+function renderVendasChart() {
+  const dados = getVendasPeriodo();
+  const empty = document.getElementById('vendasEmpty');
+  const canvas = document.getElementById('chartVendas');
+  if (!dados.length) {
+    empty.style.display = 'block';
+    canvas.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  canvas.style.display = 'block';
+  const labels = dados.map(d => { const [y,m,day]=d.data.split('-'); return day+'/'+m; });
+  const values = dados.map(d => d.vendidos);
+  if (vendasChart) {
+    vendasChart.data.labels = labels;
+    vendasChart.data.datasets[0].data = values;
+    vendasChart.update();
+    return;
+  }
+  vendasChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: '#8B101099',
+        borderColor: '#8B1010',
+        borderWidth: 1,
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      plugins: {
+        legend: {display: false},
+        tooltip: {callbacks: {label: ctx => ' ' + ctx.parsed.y + ' un vendidas'}}
+      },
+      scales: {
+        x: {grid: {color: '#f1f5f9'}, ticks: {color: '#6b7280', font: {size: 10}}},
+        y: {grid: {color: '#f1f5f9'}, ticks: {color: '#6b7280', font: {size: 10}}, beginAtZero: true}
+      }
+    }
+  });
+}
+
 // ── Populate selects ──────────────────────────────────────────────
 function populateSelects(){
   const cats=[...new Set(PRODS.map(p=>p.categoria).filter(Boolean))].sort();
@@ -1071,6 +1221,7 @@ renderProdutos();
 renderEstoque();
 carregarKitsSalvos();
 renderCharts();
+carregarHistorico();
 </script>
 </body>
 </html>
