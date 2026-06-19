@@ -213,7 +213,7 @@ input[type=range]{accent-color:var(--red);width:100%}
       <svg width="11" height="11" viewBox="0 0 16 16" fill="none" style="vertical-align:middle;margin-right:4px;opacity:.5"><rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 1v4M11 1v4M2 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       Base: 2026-06-18
     </span>
-    <button class="btn-update" onclick="alert('Para atualizar:\n1. Exporte XLS do Tiny (Produtos → Exportar)\n2. Salve em Downloads\n3. Execute: python3 atualizar_dados.py')">
+    <button class="btn-update" id="btnAtualizar" onclick="triggerUpdate()">
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="vertical-align:middle;margin-right:5px"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.5 5H13V2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Atualizar Base
     </button>
@@ -1213,6 +1213,52 @@ function populateSelects(){
     const sel=document.getElementById(id);
     cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);});
   });
+}
+
+// ── Atualizar via GitHub Actions ──────────────────────────────────
+async function triggerUpdate() {
+  let token = localStorage.getItem('gh_pat');
+  if (!token) {
+    token = prompt('Cole seu token do GitHub para atualizar:
+(Crie em: github.com → Settings → Developer settings → Personal access tokens → Fine-grained → Actions: Read and write)');
+    if (!token) return;
+    localStorage.setItem('gh_pat', token.trim());
+    token = token.trim();
+  }
+  const btn = document.getElementById('btnAtualizar');
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="vertical-align:middle;margin-right:5px;animation:spin 1s linear infinite"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.5 5H13V2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Aguardando...';
+  try {
+    const resp = await fetch(
+      'https://api.github.com/repos/lucaopfreitas-stack/sistema-future/actions/workflows/update.yml/dispatches',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ref: 'main'})
+      }
+    );
+    if (resp.status === 204) {
+      alert('Atualização iniciada!
+
+Em cerca de 3 minutos o estoque será atualizado e a página recarregará automaticamente.');
+      setTimeout(() => location.reload(), 180000);
+    } else if (resp.status === 401) {
+      localStorage.removeItem('gh_pat');
+      alert('Token inválido ou expirado. Tente novamente.');
+    } else if (resp.status === 404) {
+      alert('Workflow não encontrado. Verifique se o arquivo foi publicado no GitHub.');
+    } else {
+      alert('Erro ' + resp.status + '. Tente novamente.');
+    }
+  } catch(e) {
+    alert('Erro de conexão: ' + e.message);
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="vertical-align:middle;margin-right:5px"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.5 5H13V2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Atualizar Base';
 }
 
 // ── Init ──────────────────────────────────────────────────────────
