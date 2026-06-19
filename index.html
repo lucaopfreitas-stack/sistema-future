@@ -1235,9 +1235,7 @@ async function triggerUpdate() {
       }
     );
     if (resp.status === 204) {
-      alert('Atualização iniciada!
-
-Em cerca de 3 minutos o estoque será atualizado e a página recarregará automaticamente.');
+      alert('Atualização iniciada!\n\nEm cerca de 3 minutos o estoque será atualizado e a página recarregará automaticamente.');
       setTimeout(() => location.reload(), 180000);
     } else if (resp.status === 401) {
       localStorage.removeItem('gh_pat');
