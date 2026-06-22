@@ -385,12 +385,6 @@ input[type=range]{{accent-color:var(--red);width:100%}}
       <option value="com">Com preços Future</option>
       <option value="sem">Sem match</option>
     </select>
-    <select id="filtABCProd" onchange="renderProdutos()">
-      <option value="">Todas classes ABC</option>
-      <option value="A">Classe A</option>
-      <option value="B">Classe B</option>
-      <option value="C">Classe C</option>
-    </select>
     <span id="prodCount" class="filter-count"></span>
     <button id="btnSelAll" onclick="toggleSelAll()" style="background:var(--gray);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--sub)">☐ Selecionar todos</button>
   </div>
@@ -414,11 +408,10 @@ input[type=range]{{accent-color:var(--red);width:100%}}
         <th class="th-sort" data-col="nome" onclick="sortProd('nome')">Produto <span class="sort-icon">↕</span></th>
         <th>Categoria</th>
         <th class="r th-sort" data-col="custo" onclick="sortProd('custo')">Custo <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="pabc" onclick="sortProd('pabc')">Preço ABC <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="difAbc" onclick="sortProd('difAbc')">Custo vs ABC <span class="sort-icon">↕</span></th>
         <th class="r th-sort" data-col="pvenda" onclick="sortProd('pvenda')">P. Venda <span class="sort-icon">↕</span></th>
-        <th class="r th-sort" data-col="pabc" onclick="sortProd('pabc')">P. ABC <span class="sort-icon">↕</span></th>
-        <th class="r th-sort" data-col="margem" onclick="sortProd('margem')">Mg. Venda <span class="sort-icon">↕</span></th>
-        <th class="r th-sort" data-col="margemAbc" onclick="sortProd('margemAbc')">Mg. ABC <span class="sort-icon">↕</span></th>
-        <th class="th-sort" data-col="abc" onclick="sortProd('abc')">ABC <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="margem" onclick="sortProd('margem')">Margem% <span class="sort-icon">↕</span></th>
         <th class="r th-sort" data-col="est" onclick="sortProd('est')">Estoque <span class="sort-icon">↕</span></th>
       </tr></thead>
       <tbody id="prodTbody"></tbody>
@@ -774,22 +767,18 @@ function renderProdutos(){{
   const q=(document.getElementById('buscaProd').value||'').toLowerCase();
   const cat=document.getElementById('filtCat').value;
   const fp=document.getElementById('filtPrecos').value;
-  const abcFilt=document.getElementById('filtABCProd').value;
-  const abcMap=getAbcMap();
   let list=PRODS.filter(p=>{{
     if(q&&!p.nome.toLowerCase().includes(q)&&!p.sku.includes(q))return false;
     if(cat&&p.categoria!==cat)return false;
     if(fp==='com'&&!p.tem_precos)return false;
     if(fp==='sem'&&p.tem_precos)return false;
-    if(abcFilt&&abcMap[p.sku]!==abcFilt)return false;
     return true;
   }});
   // Ordenação
   list.sort((a,b)=>{{
     let va,vb;
     if(prodSortCol==='margem'){{va=(a.pvenda>0&&a.custo>0)?(a.pvenda-a.custo)/a.pvenda:0;vb=(b.pvenda>0&&b.custo>0)?(b.pvenda-b.custo)/b.pvenda:0;}}
-    else if(prodSortCol==='margemAbc'){{va=(a.pabc>0&&a.custo>0)?(a.pabc-a.custo)/a.pabc:0;vb=(b.pabc>0&&b.custo>0)?(b.pabc-b.custo)/b.pabc:0;}}
-    else if(prodSortCol==='abc'){{va=abcMap[a.sku]||'Z';vb=abcMap[b.sku]||'Z';}}
+    else if(prodSortCol==='difAbc'){{va=(a.pabc>0&&a.custo>0)?a.custo/a.pabc:999;vb=(b.pabc>0&&b.custo>0)?b.custo/b.pabc:999;}}
     else{{va=isNaN(a[prodSortCol])?a[prodSortCol]||'':a[prodSortCol]||0;vb=isNaN(b[prodSortCol])?b[prodSortCol]||'':b[prodSortCol]||0;}}
     if(va<vb)return -1*prodSortDir;if(va>vb)return prodSortDir;return 0;
   }});
@@ -799,23 +788,25 @@ function renderProdutos(){{
   let html='';
   for(const p of page){{
     const margem=p.pvenda>0&&p.custo>0?(p.pvenda-p.custo)/p.pvenda*100:null;
-    const margemAbc=p.pabc>0&&p.custo>0?(p.pabc-p.custo)/p.pabc*100:null;
-    const mCor=m=>m===null?'var(--sub2)':m>60?'var(--green)':m>30?'var(--amber)':'#dc2626';
+    // difAbc: % que o custo representa do preço ABC (100% = custo == pabc, <100% = comprando mais barato)
+    const difAbc=p.pabc>0&&p.custo>0?(p.custo/p.pabc*100):null;
+    const difLabel=difAbc!==null?difAbc.toFixed(1)+'%':'—';
+    // verde = custo bem abaixo do ABC, amarelo = perto, vermelho = custo >= ABC
+    const difCor=difAbc===null?'var(--sub2)':difAbc<70?'var(--green)':difAbc<90?'var(--amber)':'#dc2626';
+    const difTip=difAbc!==null?`Custo é ${{difAbc.toFixed(1)}}% do preço ABC`:'';
     const estCls=p.est===0?'est-zero':p.est<10?'est-crit':'est-ok';
     const checked=prodSelecionados.has(p.sku)?'checked':'';
     const rowCls=prodSelecionados.has(p.sku)?'row-sel':'';
-    const abcCls=abcMap[p.sku]||'';
     html+=`<tr class="${{rowCls}}" onclick="toggleSel('${{p.sku}}',event)">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${{checked}} onchange="toggleSel('${{p.sku}}',event)" style="cursor:pointer"></td>
       <td><span class="sku">${{p.sku}}</span></td>
       <td class="nome" title="${{p.nome}}">${{p.nome}}</td>
       <td style="font-size:11px;color:var(--sub)">${{p.categoria||'—'}}</td>
       <td class="td-r preco-custo">${{p.custo>0?fmt(p.custo):'—'}}</td>
-      <td class="td-r preco">${{p.pvenda>0?fmt(p.pvenda):'—'}}</td>
       <td class="td-r preco-abc">${{p.pabc>0?fmt(p.pabc):'—'}}</td>
-      <td class="td-r" style="font-size:12px;font-weight:700;color:${{mCor(margem)}}">${{margem!==null?margem.toFixed(1)+'%':'—'}}</td>
-      <td class="td-r" style="font-size:12px;font-weight:700;color:${{mCor(margemAbc)}}">${{margemAbc!==null?margemAbc.toFixed(1)+'%':'—'}}</td>
-      <td>${{abcCls?'<span class="badge badge-'+abcCls.toLowerCase()+'">'+abcCls+'</span>':'—'}}</td>
+      <td class="td-r" title="${{difTip}}" style="font-size:12px;font-weight:700;color:${{difCor}}">${{difLabel}}</td>
+      <td class="td-r preco">${{p.pvenda>0?fmt(p.pvenda):'—'}}</td>
+      <td class="td-r" style="font-size:12px;color:${{margem!==null?(margem>60?'var(--green)':margem>30?'var(--amber)':'#dc2626'):'var(--sub2)'}}">${{margem!==null?margem.toFixed(1)+'%':'—'}}</td>
       <td class="td-r ${{estCls}}">${{fmtN(p.est)}}</td>
     </tr>`;
   }}
