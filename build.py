@@ -40,6 +40,7 @@ html = f'''<!DOCTYPE html>
 <title>Sistema Future — Endocommerce</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 :root{{
@@ -387,6 +388,7 @@ input[type=range]{{accent-color:var(--red);width:100%}}
     </select>
     <span id="prodCount" class="filter-count"></span>
     <button id="btnSelAll" onclick="toggleSelAll()" style="background:var(--gray);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--sub)">☐ Selecionar todos</button>
+    <button onclick="exportarTodos()" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--green)">⬇ Exportar todos</button>
   </div>
   <!-- Totalizador de seleção -->
   <div id="selBar" style="display:none;background:#1a1a2e;color:#fff;border-radius:10px;padding:12px 18px;margin-bottom:12px;display:none;align-items:center;gap:24px;flex-wrap:wrap">
@@ -398,6 +400,7 @@ input[type=range]{{accent-color:var(--red);width:100%}}
       <div><div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Unidades</div><div style="font-size:15px;font-weight:800;color:#fff" id="selUnits">0</div></div>
       <div><div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px">Margem Média</div><div style="font-size:15px;font-weight:800;color:#a78bfa" id="selMargem">0%</div></div>
     </div>
+    <button onclick="exportarSelecionados()" style="background:#15803d;border:none;border-radius:6px;padding:5px 14px;color:#fff;font-size:11px;font-weight:700;cursor:pointer">⬇ Exportar Excel</button>
     <button onclick="limparSel()" style="background:#374151;border:none;border-radius:6px;padding:5px 12px;color:#9ca3af;font-size:11px;font-weight:600;cursor:pointer">✕ Limpar</button>
   </div>
   <div class="tbl-wrap">
@@ -1298,6 +1301,43 @@ function populateSelects(){{
     const sel=document.getElementById(id);
     cats.forEach(c=>{{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}});
   }});
+}}
+
+// ── Exportar Excel ────────────────────────────────────────────────
+function prodParaLinha(p){{
+  const difAbc=p.pabc>0&&p.custo>0?(p.custo/p.pabc*100):null;
+  const margem=p.pvenda>0&&p.custo>0?((p.pvenda-p.custo)/p.pvenda*100):null;
+  return{{
+    'SKU':           p.sku,
+    'Produto':       p.nome,
+    'Categoria':     p.categoria||'',
+    'Custo (R$)':    p.custo||0,
+    'Preço ABC (R$)':p.pabc||0,
+    'Custo vs ABC (%)': difAbc!==null?parseFloat(difAbc.toFixed(1)):'',
+    'P. Venda (R$)': p.pvenda||0,
+    'Margem (%)':    margem!==null?parseFloat(margem.toFixed(1)):'',
+    'Estoque':       p.est||0,
+  }};
+}}
+
+function exportarXLSX(lista, nomeArquivo){{
+  const rows=lista.map(prodParaLinha);
+  const ws=XLSX.utils.json_to_sheet(rows);
+  // Largura das colunas
+  ws['!cols']=[{{wch:8}},{{wch:52}},{{wch:22}},{{wch:12}},{{wch:14}},{{wch:16}},{{wch:13}},{{wch:12}},{{wch:10}}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Produtos Future');
+  XLSX.writeFile(wb, nomeArquivo);
+}}
+
+function exportarSelecionados(){{
+  const lista=PRODS.filter(p=>prodSelecionados.has(p.sku));
+  if(!lista.length){{alert('Selecione pelo menos um produto.');return;}}
+  exportarXLSX(lista,'produtos_selecionados.xlsx');
+}}
+
+function exportarTodos(){{
+  exportarXLSX(prodListAtual,'produtos_future.xlsx');
 }}
 
 // ── Atualizar via GitHub Actions ──────────────────────────────────
