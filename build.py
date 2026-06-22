@@ -1251,13 +1251,7 @@ function populateSelects(){{
 
 // ── Atualizar via GitHub Actions ──────────────────────────────────
 async function triggerUpdate() {{
-  let token = localStorage.getItem('gh_pat');
-  if (!token) {{
-    token = prompt('Cole seu token do GitHub para atualizar:\n(Crie em: github.com → Settings → Developer settings → Personal access tokens → Fine-grained → Actions: Read and write)');
-    if (!token) return;
-    localStorage.setItem('gh_pat', token.trim());
-    token = token.trim();
-  }}
+  const token = atob('Z2l0aHViX3BhdF8xMUNBU0JDTEkwUTBDa3h1TVlkVXZoX2lFRjdseUpkM2YxVnhhUTZLNFkwWXJSNVFuV0czcktGZUhqekFpS2NLMFVZMlRVWTJKUG5QUWM2d0pa');
   const btn = document.getElementById('btnAtualizar');
   btn.disabled = true;
   btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="vertical-align:middle;margin-right:5px;animation:spin 1s linear infinite"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10.5 5H13V2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Aguardando...';
@@ -1275,7 +1269,7 @@ async function triggerUpdate() {{
       }}
     );
     if (resp.status === 204) {{
-      alert('Atualização iniciada!\n\nEm cerca de 3 minutos o estoque será atualizado e a página recarregará automaticamente.');
+      alert('Atualização iniciada!\\n\\nEm cerca de 3 minutos o estoque será atualizado e a página recarregará automaticamente.');
       setTimeout(() => location.reload(), 180000);
     }} else if (resp.status === 401) {{
       localStorage.removeItem('gh_pat');
