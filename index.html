@@ -351,6 +351,12 @@ input[type=range]{accent-color:var(--red);width:100%}
       <option value="com">Com preços Future</option>
       <option value="sem">Sem match</option>
     </select>
+    <select id="filtABCProd" onchange="renderProdutos()">
+      <option value="">Todas classes ABC</option>
+      <option value="A">Classe A</option>
+      <option value="B">Classe B</option>
+      <option value="C">Classe C</option>
+    </select>
     <span id="prodCount" class="filter-count"></span>
     <button id="btnSelAll" onclick="toggleSelAll()" style="background:var(--gray);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--sub)">☐ Selecionar todos</button>
   </div>
@@ -374,9 +380,11 @@ input[type=range]{accent-color:var(--red);width:100%}
         <th class="th-sort" data-col="nome" onclick="sortProd('nome')">Produto <span class="sort-icon">↕</span></th>
         <th>Categoria</th>
         <th class="r th-sort" data-col="custo" onclick="sortProd('custo')">Custo <span class="sort-icon">↕</span></th>
-        <th class="r th-sort" data-col="pvenda" onclick="sortProd('pvenda')">P. Venda (c/ est.) <span class="sort-icon">↕</span></th>
-        <th class="r th-sort" data-col="pabc" onclick="sortProd('pabc')">P. ABC (s/ est.) <span class="sort-icon">↕</span></th>
-        <th class="r th-sort" data-col="margem" onclick="sortProd('margem')">Margem% <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="pvenda" onclick="sortProd('pvenda')">P. Venda <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="pabc" onclick="sortProd('pabc')">P. ABC <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="margem" onclick="sortProd('margem')">Mg. Venda <span class="sort-icon">↕</span></th>
+        <th class="r th-sort" data-col="margemAbc" onclick="sortProd('margemAbc')">Mg. ABC <span class="sort-icon">↕</span></th>
+        <th class="th-sort" data-col="abc" onclick="sortProd('abc')">ABC <span class="sort-icon">↕</span></th>
         <th class="r th-sort" data-col="est" onclick="sortProd('est')">Estoque <span class="sort-icon">↕</span></th>
       </tr></thead>
       <tbody id="prodTbody"></tbody>
@@ -431,9 +439,11 @@ input[type=range]{accent-color:var(--red);width:100%}
   </div>
   <div class="tbl-wrap">
     <table>
+  <div id="abcResumo" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
       <thead><tr>
         <th>#</th><th>SKU</th><th>Produto</th><th>Classe</th>
         <th class="r">Estoque</th><th class="r">Valor (custo)</th>
+        <th class="r">P. Venda</th><th class="r">Margem %</th>
         <th class="r">% do Total</th><th class="r">% Acumulado</th>
       </tr></thead>
       <tbody id="abcTbody"></tbody>
@@ -719,21 +729,33 @@ function sortProd(col){
   renderProdutos();
 }
 
+function getAbcMap(){
+  if(!abcData.length)buildABC();
+  const m={};
+  abcData.forEach(p=>m[p.sku]=p.abc);
+  return m;
+}
+
 function renderProdutos(){
   const q=(document.getElementById('buscaProd').value||'').toLowerCase();
   const cat=document.getElementById('filtCat').value;
   const fp=document.getElementById('filtPrecos').value;
+  const abcFilt=document.getElementById('filtABCProd').value;
+  const abcMap=getAbcMap();
   let list=PRODS.filter(p=>{
     if(q&&!p.nome.toLowerCase().includes(q)&&!p.sku.includes(q))return false;
     if(cat&&p.categoria!==cat)return false;
     if(fp==='com'&&!p.tem_precos)return false;
     if(fp==='sem'&&p.tem_precos)return false;
+    if(abcFilt&&abcMap[p.sku]!==abcFilt)return false;
     return true;
   });
   // Ordenação
   list.sort((a,b)=>{
     let va,vb;
     if(prodSortCol==='margem'){va=(a.pvenda>0&&a.custo>0)?(a.pvenda-a.custo)/a.pvenda:0;vb=(b.pvenda>0&&b.custo>0)?(b.pvenda-b.custo)/b.pvenda:0;}
+    else if(prodSortCol==='margemAbc'){va=(a.pabc>0&&a.custo>0)?(a.pabc-a.custo)/a.pabc:0;vb=(b.pabc>0&&b.custo>0)?(b.pabc-b.custo)/b.pabc:0;}
+    else if(prodSortCol==='abc'){va=abcMap[a.sku]||'Z';vb=abcMap[b.sku]||'Z';}
     else{va=isNaN(a[prodSortCol])?a[prodSortCol]||'':a[prodSortCol]||0;vb=isNaN(b[prodSortCol])?b[prodSortCol]||'':b[prodSortCol]||0;}
     if(va<vb)return -1*prodSortDir;if(va>vb)return prodSortDir;return 0;
   });
@@ -743,10 +765,12 @@ function renderProdutos(){
   let html='';
   for(const p of page){
     const margem=p.pvenda>0&&p.custo>0?(p.pvenda-p.custo)/p.pvenda*100:null;
-    const m=margem!==null?margem.toFixed(1)+'%':'—';
+    const margemAbc=p.pabc>0&&p.custo>0?(p.pabc-p.custo)/p.pabc*100:null;
+    const mCor=m=>m===null?'var(--sub2)':m>60?'var(--green)':m>30?'var(--amber)':'#dc2626';
     const estCls=p.est===0?'est-zero':p.est<10?'est-crit':'est-ok';
     const checked=prodSelecionados.has(p.sku)?'checked':'';
     const rowCls=prodSelecionados.has(p.sku)?'row-sel':'';
+    const abcCls=abcMap[p.sku]||'';
     html+=`<tr class="${rowCls}" onclick="toggleSel('${p.sku}',event)">
       <td onclick="event.stopPropagation()"><input type="checkbox" ${checked} onchange="toggleSel('${p.sku}',event)" style="cursor:pointer"></td>
       <td><span class="sku">${p.sku}</span></td>
@@ -755,7 +779,9 @@ function renderProdutos(){
       <td class="td-r preco-custo">${p.custo>0?fmt(p.custo):'—'}</td>
       <td class="td-r preco">${p.pvenda>0?fmt(p.pvenda):'—'}</td>
       <td class="td-r preco-abc">${p.pabc>0?fmt(p.pabc):'—'}</td>
-      <td class="td-r" style="font-size:12px;color:${margem!==null?(margem>60?'var(--green)':margem>30?'var(--amber)':'#dc2626'):'var(--sub2)'}">${m}</td>
+      <td class="td-r" style="font-size:12px;font-weight:700;color:${mCor(margem)}">${margem!==null?margem.toFixed(1)+'%':'—'}</td>
+      <td class="td-r" style="font-size:12px;font-weight:700;color:${mCor(margemAbc)}">${margemAbc!==null?margemAbc.toFixed(1)+'%':'—'}</td>
+      <td>${abcCls?'<span class="badge badge-'+abcCls.toLowerCase()+'">'+abcCls+'</span>':'—'}</td>
       <td class="td-r ${estCls}">${fmtN(p.est)}</td>
     </tr>`;
   }
@@ -850,11 +876,42 @@ function buildABC(){
   abcData=sorted.map((p,i)=>{
     const v=p.est*p.custo;acc+=v;const pct=acc/valTotal;
     let cls=pct<=0.8?'A':pct<=0.95?'B':'C';
-    return{...p,val_est:v,pct_total:(v/valTotal)*100,pct_acum:pct*100,abc:cls,rank:i+1};
+    const margem=p.pvenda>0?((p.pvenda-p.custo)/p.pvenda*100):null;
+    return{...p,val_est:v,pct_total:(v/valTotal)*100,pct_acum:pct*100,abc:cls,rank:i+1,margem};
   });
 }
+
+function renderABCResumo(){
+  const classes={'A':{prods:[],cor:'#166534',bg:'#dcfce7'},'B':{prods:[],cor:'#854d0e',bg:'#fef9c3'},'C':{prods:[],cor:'#991b1b',bg:'#fee2e2'}};
+  abcData.forEach(p=>{ if(classes[p.abc]) classes[p.abc].prods.push(p); });
+  let html='';
+  for(const [cls,info] of Object.entries(classes)){
+    const prods=info.prods;
+    const margens=prods.filter(p=>p.margem!==null).map(p=>p.margem);
+    const margMedia=margens.length?margens.reduce((a,b)=>a+b)/margens.length:0;
+    const margMin=margens.length?Math.min(...margens):0;
+    const margMax=margens.length?Math.max(...margens):0;
+    html+=`<div style="background:${info.bg};border:1px solid ${info.cor}30;border-radius:12px;padding:14px 18px;min-width:200px;flex:1">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span class="badge badge-${cls.toLowerCase()}" style="font-size:13px;padding:4px 12px">${cls}</span>
+        <span style="font-size:11px;color:#6b7280;font-weight:600">${prods.length} produtos</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Margem média</div>
+          <div style="font-size:18px;font-weight:800;color:${info.cor}">${margMedia.toFixed(1)}%</div></div>
+        <div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Mínima</div>
+          <div style="font-size:16px;font-weight:700;color:#374151">${margMin.toFixed(1)}%</div></div>
+        <div><div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">Máxima</div>
+          <div style="font-size:16px;font-weight:700;color:#374151">${margMax.toFixed(1)}%</div></div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('abcResumo').innerHTML=html;
+}
+
 function renderABC(){
   if(!abcData.length)buildABC();
+  renderABCResumo();
   const q=(document.getElementById('buscaABC').value||'').toLowerCase();
   const f=document.getElementById('filtABC').value;
   const list=abcData.filter(p=>{
@@ -864,6 +921,7 @@ function renderABC(){
   });
   let html='';
   for(const p of list){
+    const margCor=p.margem!==null?(p.margem>60?'var(--green)':p.margem>30?'var(--amber)':'#dc2626'):'var(--sub2)';
     html+=`<tr>
       <td class="sku">${p.rank}</td>
       <td class="sku">${p.sku}</td>
@@ -871,11 +929,13 @@ function renderABC(){
       <td><span class="badge badge-${p.abc.toLowerCase()}">${p.abc}</span></td>
       <td class="td-r">${fmtN(p.est)}</td>
       <td class="td-r preco-custo">${fmt(p.val_est)}</td>
+      <td class="td-r preco">${p.pvenda>0?fmt(p.pvenda):'—'}</td>
+      <td class="td-r" style="font-weight:700;color:${margCor}">${p.margem!==null?p.margem.toFixed(1)+'%':'—'}</td>
       <td class="td-r" style="font-size:11px">${p.pct_total.toFixed(2)}%</td>
       <td class="td-r" style="font-size:11px">${p.pct_acum.toFixed(1)}%</td>
     </tr>`;
   }
-  document.getElementById('abcTbody').innerHTML=html||'<tr><td colspan="8" class="empty">Nenhum produto</td></tr>';
+  document.getElementById('abcTbody').innerHTML=html||'<tr><td colspan="10" class="empty">Nenhum produto</td></tr>';
 }
 
 // ── Supabase ──────────────────────────────────────────────────────
