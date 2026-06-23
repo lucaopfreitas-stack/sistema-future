@@ -379,16 +379,39 @@ input[type=range]{{accent-color:var(--red);width:100%}}
 <!-- ══════════════ PRODUTOS ══════════════ -->
 <div class="tab-pane" id="tab-produtos">
   <div class="filter-row">
-    <input type="text" id="buscaProd" placeholder="Buscar produto ou SKU..." oninput="renderProdutos()">
-    <select id="filtCat" onchange="renderProdutos()"><option value="">Todas categorias</option></select>
-    <select id="filtPrecos" onchange="renderProdutos()">
-      <option value="">Todos</option>
-      <option value="com">Com preços Future</option>
-      <option value="sem">Sem match</option>
+    <input type="text" id="buscaProd" placeholder="Buscar produto ou SKU..." oninput="renderProdutos()" style="min-width:220px">
+    <select id="filtMargem" onchange="renderProdutos()">
+      <option value="">Margem: Todas</option>
+      <option value="alta">Alta (&gt;60%)</option>
+      <option value="media">Média (30–60%)</option>
+      <option value="baixa">Baixa (&lt;30%)</option>
+      <option value="sem">Sem margem calc.</option>
+    </select>
+    <select id="filtEstoque" onchange="renderProdutos()">
+      <option value="">Estoque: Todos</option>
+      <option value="ok">OK (≥50)</option>
+      <option value="baixo">Baixo (10–49)</option>
+      <option value="crit">Crítico (&lt;10)</option>
+      <option value="zero">Zerado</option>
+      <option value="alto">Alto (&gt;300)</option>
+    </select>
+    <select id="filtPrecoABC" onchange="renderProdutos()">
+      <option value="">Preço ABC: Todos</option>
+      <option value="com">Com preço ABC</option>
+      <option value="sem">Sem preço ABC</option>
+    </select>
+    <select id="filtCustoABC" onchange="renderProdutos()">
+      <option value="">Custo vs ABC: Todos</option>
+      <option value="urgente">Urgente negociar (&gt;90%)</option>
+      <option value="atencao">Atenção (70–90%)</option>
+      <option value="bom">Bom (&lt;70%)</option>
     </select>
     <span id="prodCount" class="filter-count"></span>
+  </div>
+  <div class="filter-row" style="margin-top:-4px">
     <button id="btnSelAll" onclick="toggleSelAll()" style="background:var(--gray);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--sub)">☐ Selecionar todos</button>
-    <button onclick="exportarTodos()" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--green)">⬇ Exportar todos</button>
+    <button onclick="exportarTodos()" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:var(--green)">⬇ Exportar filtrados</button>
+    <button onclick="limparFiltros()" style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;color:var(--sub)">✕ Limpar filtros</button>
   </div>
   <!-- Totalizador de seleção -->
   <div id="selBar" style="display:none;background:#1a1a2e;color:#fff;border-radius:10px;padding:12px 18px;margin-bottom:12px;display:none;align-items:center;gap:24px;flex-wrap:wrap">
@@ -768,13 +791,39 @@ function getAbcMap(){{
 
 function renderProdutos(){{
   const q=(document.getElementById('buscaProd').value||'').toLowerCase();
-  const cat=document.getElementById('filtCat').value;
-  const fp=document.getElementById('filtPrecos').value;
+  const fMargem=document.getElementById('filtMargem').value;
+  const fEst=document.getElementById('filtEstoque').value;
+  const fABC=document.getElementById('filtPrecoABC').value;
+  const fCustoABC=document.getElementById('filtCustoABC').value;
   let list=PRODS.filter(p=>{{
     if(q&&!p.nome.toLowerCase().includes(q)&&!p.sku.includes(q))return false;
-    if(cat&&p.categoria!==cat)return false;
-    if(fp==='com'&&!p.tem_precos)return false;
-    if(fp==='sem'&&p.tem_precos)return false;
+    // filtro margem
+    if(fMargem){{
+      const mg=p.pvenda>0&&p.custo>0?(p.pvenda-p.custo)/p.pvenda*100:null;
+      if(fMargem==='alta'&&(mg===null||mg<=60))return false;
+      if(fMargem==='media'&&(mg===null||mg<30||mg>60))return false;
+      if(fMargem==='baixa'&&(mg===null||mg>=30))return false;
+      if(fMargem==='sem'&&mg!==null)return false;
+    }}
+    // filtro estoque
+    if(fEst){{
+      const e=p.est||0;
+      if(fEst==='ok'&&e<50)return false;
+      if(fEst==='baixo'&&(e<10||e>=50))return false;
+      if(fEst==='crit'&&(e===0||e>=10))return false;
+      if(fEst==='zero'&&e!==0)return false;
+      if(fEst==='alto'&&e<=300)return false;
+    }}
+    // filtro preço ABC
+    if(fABC==='com'&&!(p.pabc>0))return false;
+    if(fABC==='sem'&&p.pabc>0)return false;
+    // filtro custo vs ABC
+    if(fCustoABC){{
+      const d=p.pabc>0&&p.custo>0?p.custo/p.pabc*100:null;
+      if(fCustoABC==='urgente'&&(d===null||d<=90))return false;
+      if(fCustoABC==='atencao'&&(d===null||d<70||d>90))return false;
+      if(fCustoABC==='bom'&&(d===null||d>=70))return false;
+    }}
     return true;
   }});
   // Ordenação
@@ -840,6 +889,12 @@ function toggleSelAll(){{
 }}
 
 function limparSel(){{prodSelecionados.clear();renderProdutos();}}
+function limparFiltros(){{
+  ['buscaProd','filtMargem','filtEstoque','filtPrecoABC','filtCustoABC'].forEach(id=>{{
+    const el=document.getElementById(id);if(el)el.value='';
+  }});
+  renderProdutos();
+}}
 
 function atualizarSelBar(){{
   const bar=document.getElementById('selBar');
@@ -1297,10 +1352,8 @@ function renderVendasChart() {{
 // ── Populate selects ──────────────────────────────────────────────
 function populateSelects(){{
   const cats=[...new Set(PRODS.map(p=>p.categoria).filter(Boolean))].sort();
-  ['filtCat','campCat'].forEach(id=>{{
-    const sel=document.getElementById(id);
-    cats.forEach(c=>{{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o);}});
-  }});
+  const campCat=document.getElementById('campCat');
+  if(campCat) cats.forEach(c=>{{const o=document.createElement('option');o.value=c;o.textContent=c;campCat.appendChild(o);}});
 }}
 
 // ── Exportar Excel ────────────────────────────────────────────────
