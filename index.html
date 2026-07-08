@@ -349,10 +349,10 @@ input[type=range]{accent-color:var(--red);width:100%}
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
           <tr style="border-bottom:2px solid var(--border)">
-            <th style="text-align:left;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">PRODUTO</th>
-            <th style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">VENDIDAS</th>
-            <th style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">P. VENDA</th>
-            <th style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">RECEITA APROX.</th>
+            <th onclick="sortVendas('nome')" style="text-align:left;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px;cursor:pointer;user-select:none">PRODUTO <span id="sv-nome"></span></th>
+            <th onclick="sortVendas('qtd')" style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px;cursor:pointer;user-select:none">VENDIDAS <span id="sv-qtd">↓</span></th>
+            <th onclick="sortVendas('pvenda')" style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px;cursor:pointer;user-select:none">P. VENDA <span id="sv-pvenda"></span></th>
+            <th onclick="sortVendas('receita')" style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px;cursor:pointer;user-select:none">RECEITA APROX. <span id="sv-receita"></span></th>
           </tr>
         </thead>
         <tbody id="vendasTbody"><tr><td colspan="4" style="text-align:center;color:var(--sub2);padding:20px;font-size:12px">Carregando...</td></tr></tbody>
@@ -1265,6 +1265,19 @@ function calcVendasPorProduto(dadosPeriodo) {
   return vendas;
 }
 
+let vendasSortCol = 'receita';
+let vendasSortDir = -1; // -1 = decrescente, 1 = crescente
+
+function sortVendas(col) {
+  if (vendasSortCol === col) { vendasSortDir *= -1; }
+  else { vendasSortCol = col; vendasSortDir = col === 'nome' ? 1 : -1; }
+  ['nome','qtd','pvenda','receita'].forEach(c => {
+    const el = document.getElementById('sv-'+c);
+    if (el) el.textContent = c === vendasSortCol ? (vendasSortDir === -1 ? '↓' : '↑') : '';
+  });
+  renderVendasTabela();
+}
+
 function renderVendasTabela() {
   const tbody = document.getElementById('vendasTbody');
   const resumo = document.getElementById('vendasResumo');
@@ -1304,7 +1317,13 @@ function renderVendasTabela() {
       return { sku, nome: p.nome || sku, qtd, pvenda, receita: qtd * pvenda };
     })
     .filter(r => r.qtd > 0)
-    .sort((a, b) => b.receita - a.receita);
+    .sort((a, b) => {
+      const va = a[vendasSortCol] || 0;
+      const vb = b[vendasSortCol] || 0;
+      if (va < vb) return vendasSortDir;
+      if (va > vb) return -vendasSortDir;
+      return 0;
+    });
 
   if (!lista.length) {
     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--sub2);padding:20px;font-size:12px">Nenhuma venda no período</td></tr>';
