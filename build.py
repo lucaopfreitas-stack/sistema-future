@@ -366,13 +366,32 @@ input[type=range]{{accent-color:var(--red);width:100%}}
       <button class="range-btn active" data-range="7dias" onclick="setRange('7dias')">Últimos 7 dias</button>
       <button class="range-btn" data-range="personalizado" onclick="setRange('personalizado')">Personalizado</button>
       <div class="range-custom" id="rangeCustom">
-        <input type="date" id="rangeFrom" onchange="renderVendasChart()">
+        <input type="date" id="rangeFrom" onchange="renderVendasChart();renderVendasTabela()">
         <span style="font-size:12px;color:var(--sub)">até</span>
-        <input type="date" id="rangeTo" onchange="renderVendasChart()">
+        <input type="date" id="rangeTo" onchange="renderVendasChart();renderVendasTabela()">
       </div>
     </div>
     <canvas id="chartVendas" style="max-height:200px"></canvas>
     <div id="vendasEmpty" style="text-align:center;color:var(--sub2);padding:24px;font-size:12px;display:none">Nenhum dado de vendas ainda. Aguardando primeira atualização de estoque.</div>
+  </div>
+  <div class="chart-box" style="margin-bottom:28px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div class="chart-title" style="margin-bottom:0">Vendas por Produto no Período</div>
+      <div id="vendasResumo" style="font-size:13px;color:var(--sub)"></div>
+    </div>
+    <div id="vendasTabelaWrap" style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">PRODUTO</th>
+            <th style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">VENDIDAS</th>
+            <th style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">P. VENDA</th>
+            <th style="text-align:right;padding:7px 8px;font-weight:600;color:var(--sub);font-size:11px">RECEITA APROX.</th>
+          </tr>
+        </thead>
+        <tbody id="vendasTbody"><tr><td colspan="4" style="text-align:center;color:var(--sub2);padding:20px;font-size:12px">Carregando...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -1249,6 +1268,7 @@ async function carregarHistorico() {{
   historicoData = data;
   atualizarKpiVendidos();
   renderVendasChart();
+  renderVendasTabela();
 }}
 
 function calcVendidosDia(d1, d2) {{
@@ -1260,6 +1280,94 @@ function calcVendidosDia(d1, d2) {{
     total += Math.max(0, est1 - est2);
   }}
   return total;
+}}
+
+function calcVendasPorProduto(dadosPeriodo) {{
+  // dadosPeriodo: array de {{data, snapshots}} filtrado para o período, ordenado
+  // Retorna {{sku: unidades_vendidas}} somando todas as baixas do período
+  const vendas = {{}};
+  if (dadosPeriodo.length < 2) return vendas;
+  for (let i = 1; i < dadosPeriodo.length; i++) {{
+    const snap1 = dadosPeriodo[i-1].snapshots || {{}};
+    const snap2 = dadosPeriodo[i].snapshots || {{}};
+    for (const [sku, est1] of Object.entries(snap1)) {{
+      const est2 = snap2[sku] !== undefined ? snap2[sku] : est1;
+      const diff = Math.max(0, est1 - est2);
+      if (diff > 0) vendas[sku] = (vendas[sku] || 0) + diff;
+    }}
+  }}
+  return vendas;
+}}
+
+function renderVendasTabela() {{
+  const tbody = document.getElementById('vendasTbody');
+  const resumo = document.getElementById('vendasResumo');
+  if (!tbody) return;
+  if (historicoData.length < 2) {{
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--sub2);padding:20px;font-size:12px">Sem dados no período</td></tr>';
+    return;
+  }}
+
+  // Filtra snapshots para o período selecionado (precisa do dia anterior como base)
+  const hoje = new Date().toISOString().split('T')[0];
+  const ontem = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  let from = null, to = null;
+  if (selectedRange === 'hoje') {{ from = hoje; to = hoje; }}
+  else if (selectedRange === 'ontem') {{ from = ontem; to = ontem; }}
+  else if (selectedRange === '7dias') {{
+    from = new Date(Date.now() - 7*86400000).toISOString().split('T')[0];
+    to = hoje;
+  }} else {{
+    from = document.getElementById('rangeFrom').value;
+    to = document.getElementById('rangeTo').value;
+  }}
+
+  // Pega snapshots do dia anterior ao 'from' como ponto de partida
+  const snap0 = historicoData.filter(d => d.data < from).pop();
+  const snapsFiltro = historicoData.filter(d => d.data >= from && (to ? d.data <= to : true));
+  const dadosCalc = snap0 ? [snap0, ...snapsFiltro] : snapsFiltro;
+
+  const vendas = calcVendasPorProduto(dadosCalc);
+  const prodMap = {{}};
+  PRODS.forEach(p => prodMap[p.sku] = p);
+
+  const lista = Object.entries(vendas)
+    .map(([sku, qtd]) => {{
+      const p = prodMap[sku] || {{}};
+      const pvenda = p.pvenda || 0;
+      return {{ sku, nome: p.nome || sku, qtd, pvenda, receita: qtd * pvenda }};
+    }})
+    .filter(r => r.qtd > 0)
+    .sort((a, b) => b.receita - a.receita);
+
+  if (!lista.length) {{
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--sub2);padding:20px;font-size:12px">Nenhuma venda no período</td></tr>';
+    resumo.textContent = '';
+    return;
+  }}
+
+  const totalQtd = lista.reduce((s, r) => s + r.qtd, 0);
+  const totalReceita = lista.reduce((s, r) => s + r.receita, 0);
+  resumo.innerHTML = `<span style="font-weight:700;color:var(--text)">${{fmtN(totalQtd)}} un</span> · Receita aprox. <span style="font-weight:700;color:var(--green)">${{fmt(totalReceita)}}</span>`;
+
+  tbody.innerHTML = lista.map((r, i) => `
+    <tr style="border-bottom:1px solid var(--border);${{i%2===1?'background:var(--gray)':''}}">
+      <td style="padding:7px 8px">
+        <span style="font-size:10px;color:var(--sub2);margin-right:6px">${{r.sku}}</span>
+        ${{r.nome}}
+      </td>
+      <td style="text-align:right;padding:7px 8px;font-weight:700">${{fmtN(r.qtd)}} un</td>
+      <td style="text-align:right;padding:7px 8px;color:var(--sub)">${{r.pvenda > 0 ? fmt(r.pvenda) : '—'}}</td>
+      <td style="text-align:right;padding:7px 8px;font-weight:700;color:var(--green)">${{r.receita > 0 ? fmt(r.receita) : '—'}}</td>
+    </tr>
+  `).join('') + `
+    <tr style="border-top:2px solid var(--border);background:var(--gray)">
+      <td style="padding:8px;font-weight:700">TOTAL</td>
+      <td style="text-align:right;padding:8px;font-weight:700">${{fmtN(totalQtd)}} un</td>
+      <td></td>
+      <td style="text-align:right;padding:8px;font-weight:700;color:var(--green)">${{fmt(totalReceita)}}</td>
+    </tr>
+  `;
 }}
 
 function atualizarKpiVendidos() {{
@@ -1302,6 +1410,7 @@ function setRange(r) {{
   document.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('active', b.dataset.range === r));
   document.getElementById('rangeCustom').style.display = r === 'personalizado' ? 'flex' : 'none';
   renderVendasChart();
+  renderVendasTabela();
 }}
 
 function renderVendasChart() {{
