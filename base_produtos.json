@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-08-07T21:13:25.745233",
+  "gerado_em": "2026-08-08T21:02:25.415975",
   "total_produtos": 272,
   "produtos_com_precos": 208,
   "sem_match": [
@@ -2916,7 +2916,7 @@
       "sku": "1746",
       "nome": "Pinça Pean 14 cm (Hemostática e Curativo) - Future",
       "situacao": "A",
-      "est": 203,
+      "est": 197,
       "preco_tiny": 69.11,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
@@ -3899,7 +3899,7 @@
       "sku": "1857",
       "nome": "Tesoura Cirúrgica Reta 17 cm Fina/Fina - Future",
       "situacao": "A",
-      "est": 407,
+      "est": 403,
       "preco_tiny": 62.31,
       "custo_tiny": 25.94,
       "categoria": "Instrumentais Cirúrgicos",
