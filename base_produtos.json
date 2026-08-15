@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-08-14T20:59:24.013957",
+  "gerado_em": "2026-08-15T20:51:26.700830",
   "total_produtos": 272,
   "produtos_com_precos": 208,
   "sem_match": [
@@ -2983,7 +2983,7 @@
       "sku": "1753",
       "nome": "Pinça Professor Medina Para Biópsia Uterina 24 cm - 3 mm - Future",
       "situacao": "A",
-      "est": 114,
+      "est": 112,
       "preco_tiny": 250.58,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
@@ -3963,7 +3963,7 @@
       "sku": "1878",
       "nome": "Tesoura Iris ou Gengiva Curva 12 cm - Future",
       "situacao": "A",
-      "est": 245,
+      "est": 235,
       "preco_tiny": 31.38,
       "custo_tiny": 13.596,
       "categoria": "Instrumentais Cirúrgicos",
@@ -3979,7 +3979,7 @@
       "sku": "1875",
       "nome": "Tesoura Iris ou Gengiva Reta 12 cm - Future",
       "situacao": "A",
-      "est": 380,
+      "est": 367,
       "preco_tiny": 37.39,
       "custo_tiny": 13.596,
       "categoria": "Instrumentais Cirúrgicos",
