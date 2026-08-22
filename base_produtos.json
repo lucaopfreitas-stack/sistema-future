@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-08-21T20:53:19.612842",
+  "gerado_em": "2026-08-22T20:52:02.196551",
   "total_produtos": 272,
   "produtos_com_precos": 208,
   "sem_match": [
@@ -1205,7 +1205,7 @@
       "sku": "20377",
       "nome": "Kit 3 Cabo Bisturi Nº 4 Para Lâminas 18 a 36 - Future",
       "situacao": "A",
-      "est": 116,
+      "est": 98,
       "preco_tiny": 27.42,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
@@ -3562,7 +3562,7 @@
     "1839": {
       "sku": "1839",
       "nome": "Punch Keyes Para Biópsia de Pele - 3 mm - Future",
-      "situacao": "I",
+      "situacao": "A",
       "est": 0,
       "preco_tiny": 152.16,
       "custo_tiny": 65.471,
