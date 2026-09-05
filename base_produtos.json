@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-09-04T22:30:37.864787",
+  "gerado_em": "2026-09-05T22:13:24.621662",
   "total_produtos": 272,
   "produtos_com_precos": 208,
   "sem_match": [
@@ -1600,7 +1600,7 @@
       "sku": "1553",
       "nome": "Pinça Anatômica Dissecção Com Serrilha 16 cm - Future",
       "situacao": "A",
-      "est": 736,
+      "est": 729,
       "preco_tiny": 25.49,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
@@ -1617,7 +1617,7 @@
       "sku": "1554",
       "nome": "Pinça Anatômica Dissecção Com Serrilha 18 cm - Future",
       "situacao": "A",
-      "est": 165,
+      "est": 164,
       "preco_tiny": 36.71,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
@@ -3595,7 +3595,7 @@
       "sku": "1841",
       "nome": "Punch Keyes Para Biópsia de Pele - 5 mm - Future",
       "situacao": "A",
-      "est": 24,
+      "est": 22,
       "preco_tiny": 152.16,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
