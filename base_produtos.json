@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-09-25T23:27:31.976552",
+  "gerado_em": "2026-09-26T23:07:30.959419",
   "total_produtos": 272,
   "produtos_com_precos": 208,
   "sem_match": [
@@ -1796,7 +1796,7 @@
       "sku": "1585",
       "nome": "Pinça Backhaus Para Campo 13 cm - Future",
       "situacao": "A",
-      "est": 345,
+      "est": 180,
       "preco_tiny": 55.52,
       "custo_tiny": 0.0,
       "categoria": "Instrumentais Cirúrgicos",
